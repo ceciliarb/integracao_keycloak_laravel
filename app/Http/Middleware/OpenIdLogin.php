@@ -38,9 +38,10 @@ class OpenIdLogin
             // Try to get an access token (using the authorization code grant)
             try {
                 $token = $kc_provider->getAccessToken('authorization_code', ['code' => $request->code]);
-                Cookie::queue('access_token', $token->getToken(), 100, null, null, false, true);
+
+                Cookie::queue('access_token' , $token->getToken(), 100, null, null, false, true);
                 Cookie::queue('refresh_token', $token->getRefreshToken(), 100, null, null, false, true);
-                Cookie::queue('expires', $token->getExpires(), 100, null, null, false, true);
+                Cookie::queue('expires'      , $token->getExpires(), 100, null, null, false, true);
                 return redirect('/home');
 
             } catch (\Exception $e) {

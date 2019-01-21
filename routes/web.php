@@ -23,11 +23,13 @@ Route::middleware('openid_login')->get('/login', function () {
 })->name("login");
 
 
+Route::get('/home', function () {
+    $user_name = Auth::guard('keycloak')->user();
+    if($user_name) $user_name = $user_name->getName();
+    return view('home', compact('user_name'));
+})->name("home");
+
 Route::middleware('openid_checktoken')->group(function() {
-    Route::get('/home', function () {
-        $user_name = Auth::guard('keycloak')->user()->getName();
-        return "logado! $user_name<br><br><a href='".url('logout')."'>logout</a>";
-   })->name("home");
 
     Route::get('/logout', function (Keycloak $kc) {
         return redirect($kc->getLogoutUrl(['redirect_uri' => config('keycloak.redirectLogoutUri')]));

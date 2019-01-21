@@ -36,36 +36,43 @@ class OpenIdProvider extends ServiceProvider
                 'realm'                 => config('keycloak.realm'),
                 'clientId'              => config('keycloak.clientId'),
                 'clientSecret'          => config('keycloak.clientSecret'),
-                'redirectUri'           => config('keycloak.redirectUri')
-                ]);
-            });
+                'redirectUri'           => config('keycloak.redirectUri'),
+                'scope'                 => config('keycloak.scope'),
+            ]);
+        });
 
-            Auth::viaRequest('kc', function ($request) {
-                $kc_provider = resolve('Stevenmaguire\OAuth2\Client\Provider\Keycloak');
-                $obj_token = new AccessToken(['access_token'  => Cookie::get('access_token'),
-                                              'refresh_token' => Cookie::get('refresh_token'),
-                                              'expires'       => Cookie::get('expires')]);
+        Auth::viaRequest('kc', function ($request) {
+            $kc_provider = resolve('Stevenmaguire\OAuth2\Client\Provider\Keycloak');
+            $obj_token = new AccessToken(['access_token'  => Cookie::get('access_token'),
+                                          'refresh_token' => Cookie::get('refresh_token'),
+                                          'expires'       => Cookie::get('expires')]);
+            $token = null;
+            try {
+                $token = $kc_provider->getAccessToken('refresh_token', ['refresh_token' => $obj_token->getRefreshToken()]);
+                // $token2 = $kc_provider->getAccessToken('authorization_code', ['code' => $request->code]);
+                $user  = $kc_provider->getResourceOwner($obj_token);
+                return $user;
 
-                try {
-                    $user  = $kc_provider->getResourceOwner($obj_token);
+            } catch(IdentityProviderException $e) {
+                if($obj_token->hasExpired() && $token) {
+                    Cookie::queue('access_token'  , $token->getToken(), 100, null, null, false, true);
+                    Cookie::queue('refresh_token' , $token->getRefreshToken(), 100, null, null, false, true);
+                    Cookie::queue('expires'       , $token->getExpires(), 100, null, null, false, true);
+                    $user  = $kc_provider->getResourceOwner($token);
                     return $user;
-
-                } catch(IdentityProviderException $e) {
-                    if($obj_token->hasExpired()) {
-                        $token = $kc_provider->getAccessToken('refresh_token', ['refresh_token' => $obj_token->getRefreshToken()]);
-                        Cookie::queue('access_token'  , $token->getToken(), 100, null, null, false, true);
-                        Cookie::queue('refresh_token' , $token->getRefreshToken(), 100, null, null, false, true);
-                        Cookie::queue('expires'       , $token->getExpires(), 100, null, null, false, true);
-                        $user  = $kc_provider->getResourceOwner($obj_token);
-                        return $user;
-                    }
-
-                    Cookie::forget('access_token');
-                    Cookie::forget('refresh_token');
-                    Cookie::forget('expires');
-                    return null;
                 }
-            });
+                Cookie::forget('access_token');
+                Cookie::forget('refresh_token');
+                Cookie::forget('expires');
+                return null;
+
+            } catch(\Exception $e) {
+                Cookie::forget('access_token');
+                Cookie::forget('refresh_token');
+                Cookie::forget('expires');
+                return null;
+            }
+        });
 
     }
 }
